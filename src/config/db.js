@@ -21,4 +21,22 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
+// Auto-initialize quiz_stats table
+const initTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS quiz_stats (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        total_score INT DEFAULT 0,
+        total_games_played INT DEFAULT 0
+      );
+    `);
+    console.log('PostgreSQL quiz_stats table checked/initialized successfully.');
+  } catch (error) {
+    console.error('Failed to initialize quiz_stats table:', error);
+  }
+};
+initTable();
+
 export default pool;

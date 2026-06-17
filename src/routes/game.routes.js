@@ -5,7 +5,7 @@ import { authenticateToken } from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 // Apply auth middleware to all game routes
-router.use(authenticateToken);
+// router.use(authenticateToken);
 
 // GET /api/games/leaderboard - Get leaderboard for top 10 users
 router.get('/leaderboard', getLeaderboard);

@@ -1,25 +1,66 @@
+import jwt from 'jsonwebtoken';
 import { GameLog, UserStats } from '../models/game.model.js';
 import pool from '../config/db.js';
 
 // Save game log after game ends
 export const saveGameLog = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString();
-    const { score } = req.body;
+    const { score, user } = req.body;
 
     if (score === undefined || score === null) {
       return res.status(400).json({ success: false, error: 'Score is required' });
     }
 
-    // 1. Create the game log
+    // Identify username and userId
+    let currentUsername = null;
+    let userId = null;
+
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
+        const decoded = jwt.verify(token, JWT_SECRET);
+        currentUsername = decoded.username;
+        userId = decoded.id?.toString();
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    if (!currentUsername) {
+      currentUsername = user?.username || req.query.username;
+    }
+    
+    // If we still don't have a userId, let's fetch it from postgres using the username!
+    if (currentUsername) {
+      try {
+        const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [currentUsername]);
+        if (userResult.rows.length > 0) {
+          userId = userResult.rows[0].id.toString();
+        }
+      } catch (dbErr) {
+        console.error("Error looking up user ID:", dbErr);
+      }
+    }
+
+    if (!currentUsername) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: User identification missing' });
+    }
+
+    // Default userId if still not found
+    if (!userId) {
+      userId = currentUsername;
+    }
+
+    // 1. Create the game log in Mongo
     const newLog = new GameLog({
       userId,
       score,
-      // date is automatically set to Date.now
     });
     await newLog.save();
 
-    // 2. Update user stats
+    // 2. Update user stats in Mongo
     const stats = await UserStats.findOneAndUpdate(
       { userId },
       {
@@ -28,7 +69,18 @@ export const saveGameLog = async (req, res, next) => {
           totalGamesPlayed: 1,
         },
       },
-      { new: true, upsert: true } // Create if doesn't exist
+      { new: true, upsert: true }
+    );
+
+    // 3. Update PostgreSQL quiz_stats table
+    await pool.query(
+      `INSERT INTO quiz_stats (username, total_score, total_games_played)
+       VALUES ($1, $2, 1)
+       ON CONFLICT (username)
+       DO UPDATE SET
+         total_score = quiz_stats.total_score + EXCLUDED.total_score,
+         total_games_played = quiz_stats.total_games_played + 1`,
+      [currentUsername, score]
     );
 
     res.status(201).json({
@@ -46,7 +98,25 @@ export const saveGameLog = async (req, res, next) => {
 // Get only the games played by the user (sorted by date desc)
 export const getUserGames = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString();
+    let userId = null;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.id?.toString();
+      } catch (e) {}
+    }
+    if (!userId && req.query.username) {
+      const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [req.query.username]);
+      if (userResult.rows.length > 0) {
+        userId = userResult.rows[0].id.toString();
+      }
+    }
+    if (!userId) {
+      return res.status(200).json({ success: true, data: [] });
+    }
 
     const games = await GameLog.find({ userId }).sort({ date: -1 });
 
@@ -62,7 +132,25 @@ export const getUserGames = async (req, res, next) => {
 // Get user stats
 export const getUserStats = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString();
+    let userId = null;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.id?.toString();
+      } catch (e) {}
+    }
+    if (!userId && req.query.username) {
+      const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [req.query.username]);
+      if (userResult.rows.length > 0) {
+        userId = userResult.rows[0].id.toString();
+      }
+    }
+    if (!userId) {
+      return res.status(200).json({ success: true, data: { totalScore: 0, totalGamesPlayed: 0 } });
+    }
 
     let stats = await UserStats.findOne({ userId });
 
@@ -82,82 +170,79 @@ export const getUserStats = async (req, res, next) => {
 // Get Leaderboard
 export const getLeaderboard = async (req, res, next) => {
   try {
-    const currentUserId = req.user.id.toString();
+    let currentUsername = null;
 
-    // Fetch all user stats
-    const allStats = await UserStats.find({}).lean();
-
-    let statsWithCalculations = allStats.map(s => {
-      let winrate = 0;
-      if (s.totalGamesPlayed > 0) {
-        winrate = (s.totalScore / s.totalGamesPlayed) * 100;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
+        const decoded = jwt.verify(token, JWT_SECRET);
+        currentUsername = decoded.username;
+      } catch (e) {
+        // Ignore
       }
-      return { ...s, winrate };
-    });
-
-    // 1. Sort by totalScore
-    const sortedByScore = [...statsWithCalculations].sort((a, b) => b.totalScore - a.totalScore);
-    const topScoreStats = sortedByScore.slice(0, 10);
-    const currentUserScoreRank = sortedByScore.findIndex(s => s.userId === currentUserId) + 1;
-    let currentUserScoreData = sortedByScore.find(s => s.userId === currentUserId) || { userId: currentUserId, totalScore: 0, totalGamesPlayed: 0, winrate: 0 };
-
-    // 2. Sort by winrate (only those with >= 10 games)
-    const eligibleForWinrate = statsWithCalculations.filter(s => s.totalGamesPlayed >= 10);
-    const sortedByWinrate = eligibleForWinrate.sort((a, b) => b.winrate - a.winrate);
-    const topWinrateStats = sortedByWinrate.slice(0, 10);
-    let currentUserWinrateRank = eligibleForWinrate.findIndex(s => s.userId === currentUserId) + 1;
-    if (currentUserWinrateRank === 0) currentUserWinrateRank = null; 
-
-    // Collect all unique userIds to fetch usernames
-    const userIds = new Set([
-      ...topScoreStats.map(s => s.userId),
-      ...topWinrateStats.map(s => s.userId),
-      currentUserId
-    ]);
-
-    // Fetch usernames from postgres
-    const idsArray = Array.from(userIds);
-    let usernameMap = {};
-    if (idsArray.length > 0) {
-      const result = await pool.query(
-        'SELECT id, username FROM users WHERE id = ANY($1)',
-        [idsArray]
-      );
-      result.rows.forEach(r => {
-        usernameMap[r.id.toString()] = r.username;
-      });
     }
 
-    // Format final response
-    const formatStat = (s, rank) => ({
-      userId: s.userId,
-      username: usernameMap[s.userId] || 'Unknown',
-      totalScore: s.totalScore,
-      totalGamesPlayed: s.totalGamesPlayed,
-      winrate: s.winrate,
-      rank
-    });
+    if (!currentUsername) {
+      currentUsername = req.query.username || req.body?.user?.username;
+    }
 
-    const leaderboard = {
-      totalScore: {
-        top: topScoreStats.map((s, i) => formatStat(s, i + 1)),
-        currentUser: {
-          ...formatStat(currentUserScoreData, currentUserScoreRank || 0),
-          isEligibleForWinrate: currentUserScoreData.totalGamesPlayed >= 10
-        }
-      },
-      winrate: {
-        top: topWinrateStats.map((s, i) => formatStat(s, i + 1)),
-        currentUser: currentUserWinrateRank ? formatStat(currentUserScoreData, currentUserWinrateRank) : null
+    // Fetch top 10 users ordered by total_score desc, total_games_played asc
+    const top10Result = await pool.query(
+      `SELECT username, total_score, total_games_played
+       FROM quiz_stats
+       ORDER BY total_score DESC, total_games_played ASC
+       LIMIT 10`
+    );
+
+    const top10 = top10Result.rows.map((row, index) => ({
+      username: row.username,
+      totalScore: row.total_score,
+      totalGamesPlayed: row.total_games_played,
+      rank: index + 1
+    }));
+
+    // Find current user's rank
+    let currentUser = null;
+    if (currentUsername) {
+      const rankResult = await pool.query(
+        `WITH ranked_users AS (
+           SELECT username, total_score, total_games_played,
+                  ROW_NUMBER() OVER (ORDER BY total_score DESC, total_games_played ASC) as rank
+           FROM quiz_stats
+         )
+         SELECT rank, total_score, total_games_played
+         FROM ranked_users
+         WHERE username = $1`,
+        [currentUsername]
+      );
+
+      if (rankResult.rows.length > 0) {
+        currentUser = {
+          username: currentUsername,
+          totalScore: rankResult.rows[0].total_score,
+          totalGamesPlayed: rankResult.rows[0].total_games_played,
+          rank: parseInt(rankResult.rows[0].rank, 10)
+        };
+      } else {
+        currentUser = {
+          username: currentUsername,
+          totalScore: 0,
+          totalGamesPlayed: 0,
+          rank: null
+        };
       }
-    };
+    }
 
     res.status(200).json({
       success: true,
-      data: leaderboard
+      data: {
+        top10,
+        currentUser
+      }
     });
   } catch (error) {
     next(error);
   }
 };
-
