@@ -21,9 +21,24 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-// Auto-initialize quiz_stats table
+// Auto-initialize tables
 const initTable = async () => {
   try {
+    // Add email column to users if not exists
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE;
+    `);
+
+    // Create otps table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS otps (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        otp VARCHAR(6) NOT NULL,
+        expires_at TIMESTAMP NOT NULL
+      );
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS quiz_stats (
         id SERIAL PRIMARY KEY,
@@ -32,9 +47,9 @@ const initTable = async () => {
         total_games_played INT DEFAULT 0
       );
     `);
-    console.log('PostgreSQL quiz_stats table checked/initialized successfully.');
+    console.log('PostgreSQL tables initialized successfully.');
   } catch (error) {
-    console.error('Failed to initialize quiz_stats table:', error);
+    console.error('Failed to initialize tables:', error);
   }
 };
 initTable();
