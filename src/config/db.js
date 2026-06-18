@@ -47,6 +47,16 @@ const initTable = async () => {
         total_games_played INT DEFAULT 0
       );
     `);
+
+    // Password history — prevents users from reusing old passwords
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_history (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     console.log('PostgreSQL tables initialized successfully.');
   } catch (error) {
     console.error('Failed to initialize tables:', error);

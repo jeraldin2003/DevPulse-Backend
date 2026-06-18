@@ -35,3 +35,27 @@ export const sendOtpEmail = async (email, otp) => {
     `,
   });
 };
+
+export const sendPasswordResetOtpEmail = async (email, otp) => {
+  await transporter.sendMail({
+    from: `"DevPulse" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: 'DevPulse — Password Reset Code',
+    html: `
+      <div style="font-family: Inter, Arial, sans-serif; max-width: 480px; margin: auto; padding: 32px; background: #fffbf0; border-radius: 12px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; background: #d97706; border-radius: 10px; padding: 12px 20px;">
+            <span style="color: white; font-size: 20px; font-weight: 700;">DevPulse</span>
+          </div>
+        </div>
+        <h2 style="color: #1e293b; text-align: center; margin-bottom: 8px;">Password Reset Request</h2>
+        <p style="color: #64748b; text-align: center; margin-bottom: 28px;">Use the code below to reset your password. It expires in <strong>10 minutes</strong>.</p>
+        <div style="background: white; border: 2px solid #fde68a; border-radius: 10px; padding: 24px; text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 40px; font-weight: 800; letter-spacing: 10px; color: #d97706;">${otp}</span>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px; text-align: center;">If you did not request a password reset, please ignore this email. Your account is safe.</p>
+      </div>
+    `,
+  });
+};
+
