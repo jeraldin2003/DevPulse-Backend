@@ -1,4 +1,3 @@
-import jwt from 'jsonwebtoken';
 import { GameLog, UserStats } from '../models/game.model.js';
 import pool from '../config/db.js';
 
@@ -15,23 +14,9 @@ export const saveGameLog = async (req, res, next) => {
     let currentUsername = null;
     let userId = null;
 
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token) {
-      try {
-        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
-        const decoded = jwt.verify(token, JWT_SECRET);
-        currentUsername = decoded.username;
-        userId = decoded.id?.toString();
-      } catch (e) {
-        // Ignore
-      }
-    }
-
     if (!currentUsername) {
       currentUsername = user?.username || req.query.username;
     }
-    
     // If we still don't have a userId, let's fetch it from postgres using the username!
     if (currentUsername) {
       try {
@@ -99,15 +84,6 @@ export const saveGameLog = async (req, res, next) => {
 export const getUserGames = async (req, res, next) => {
   try {
     let userId = null;
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token) {
-      try {
-        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
-        const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.id?.toString();
-      } catch (e) {}
-    }
     if (!userId && req.query.username) {
       const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [req.query.username]);
       if (userResult.rows.length > 0) {
@@ -133,15 +109,6 @@ export const getUserGames = async (req, res, next) => {
 export const getUserStats = async (req, res, next) => {
   try {
     let userId = null;
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token) {
-      try {
-        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
-        const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.id?.toString();
-      } catch (e) {}
-    }
     if (!userId && req.query.username) {
       const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [req.query.username]);
       if (userResult.rows.length > 0) {
@@ -171,18 +138,6 @@ export const getUserStats = async (req, res, next) => {
 export const getLeaderboard = async (req, res, next) => {
   try {
     let currentUsername = null;
-
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token) {
-      try {
-        const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_access_key';
-        const decoded = jwt.verify(token, JWT_SECRET);
-        currentUsername = decoded.username;
-      } catch (e) {
-        // Ignore
-      }
-    }
 
     if (!currentUsername) {
       currentUsername = req.query.username || req.body?.user?.username;
