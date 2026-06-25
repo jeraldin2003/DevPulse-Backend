@@ -4,6 +4,7 @@ import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import gameRoutes from './routes/game.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import contactRoutes from './routes/contact.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import dotenv from 'dotenv'
 
@@ -26,7 +27,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/games', gameRoutes);
-app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Error middleware
 app.use(errorHandler);
