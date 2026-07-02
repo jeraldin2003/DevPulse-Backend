@@ -15,16 +15,7 @@ jest.mock('../../config/db.js', () => ({
   default: { query: jest.fn().mockResolvedValue({ rows: [] }) },
 }));
 
-jest.mock('../../models/game.model.js', () => ({
-  __esModule: true,
-  GameLog: jest.fn().mockImplementation(() => ({
-    save: jest.fn().mockResolvedValue({}),
-  })),
-  UserStats: {
-    findOneAndUpdate: jest.fn(),
-    findOne: jest.fn(),
-  },
-}));
+
 
 jest.mock('../../models/user.model.js', () => ({
   __esModule: true,
@@ -97,41 +88,7 @@ const mockAuthFail = () => {
   });
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// GET /api/users/profile
-// ═══════════════════════════════════════════════════════════════════════════════
 
-describe('GET /api/users/profile', () => {
-  test('401 — no Authorization header', async () => {
-    const res = await request(app).get('/api/users/profile');
-    expect(res.status).toBe(401);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toMatch(/access token missing/i);
-  });
-
-  test('403 — invalid or expired token', async () => {
-    mockAuthFail();
-
-    const res = await request(app)
-      .get('/api/users/profile')
-      .set('Authorization', 'Bearer badtoken');
-
-    expect(res.status).toBe(403);
-    expect(res.body.success).toBe(false);
-  });
-
-  test('200 — returns user profile when authenticated', async () => {
-    mockAuthSuccess({ id: 7, username: 'bob' });
-
-    const res = await request(app)
-      .get('/api/users/profile')
-      .set('Authorization', 'Bearer validtoken');
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.user).toEqual({ id: 7, username: 'bob' });
-  });
-});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // POST /api/users/change-password

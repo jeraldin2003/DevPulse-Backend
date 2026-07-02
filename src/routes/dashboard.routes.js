@@ -1,11 +1,11 @@
 import express from 'express';
 // import { authenticateToken } from '../middleware/auth.middleware';
-import { fetchCountriesController, fetchPostsController, fetchUsersController, fetchTodosController, fetchTriviaController } from '../controllers/api.controller.js';
+import { fetchPostsController, fetchUsersController, fetchTodosController, fetchTriviaController } from '../controllers/api.controller.js';
 const router = express.Router();
 
 // router.use(authenticateToken);
 
-router.get('/countries', fetchCountriesController)
+// router.get('/countries', fetchCountriesController)
 router.get('/posts', fetchPostsController)
 router.get('/todos', fetchTodosController)
 router.get('/users', fetchUsersController)

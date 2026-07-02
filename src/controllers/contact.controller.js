@@ -1,4 +1,5 @@
 import { sendContactConfirmationEmail } from '../helpers/mail.helper.js';
+import { saveFeedback } from '../models/feedback.model.js';
 
 // ─── POST /api/contact ────────────────────────────────────────────────────────
 export const submitContactForm = async (req, res, next) => {
@@ -15,6 +16,14 @@ export const submitContactForm = async (req, res, next) => {
     if (!message?.trim() || message.trim().length < 20) {
       return res.status(400).json({ success: false, error: 'Message must be at least 20 characters.' });
     }
+
+    // Save to database first
+    await saveFeedback({
+      name: name.trim(),
+      email: email.trim(),
+      subject: subject?.trim() || null,
+      message: message.trim(),
+    });
 
     await sendContactConfirmationEmail({
       name: name.trim(),

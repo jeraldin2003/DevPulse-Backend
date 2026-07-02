@@ -3,14 +3,14 @@ import { fetchPosts } from "../utils/posts.js";
 import { fetchUsers } from "../utils/users.js"
 import { fetchTodos } from "../utils/todos.js"
 import { fetchTrivia } from "../utils/trivia.js"
-export const fetchCountriesController = async (req, res, next) => {
-    try {
-        const data = await fetchCountries();
-        res.status(200).json({ success: true, data });
-    } catch (error) {
-        next(error);
-    }
-};
+// export const fetchCountriesController = async (req, res, next) => {
+//     try {
+//         const data = await fetchCountries();
+//         res.status(200).json({ success: true, data });
+//     } catch (error) {
+//         next(error);
+//     }
+// };
 
 export const fetchPostsController = async (req, res, next) => {
     try {

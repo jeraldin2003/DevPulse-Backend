@@ -1,4 +1,3 @@
-import { GameLog, UserStats } from '../models/game.model.js';
 import pool from '../config/db.js';
 
 // Save game log after game ends
@@ -38,26 +37,7 @@ export const saveGameLog = async (req, res, next) => {
       userId = currentUsername;
     }
 
-    // 1. Create the game log in Mongo
-    const newLog = new GameLog({
-      userId,
-      score,
-    });
-    await newLog.save();
-
-    // 2. Update user stats in Mongo
-    const stats = await UserStats.findOneAndUpdate(
-      { userId },
-      {
-        $inc: {
-          totalScore: score,
-          totalGamesPlayed: 1,
-        },
-      },
-      { new: true, upsert: true }
-    );
-
-    // 3. Update PostgreSQL quiz_stats table
+    // Update PostgreSQL quiz_stats table
     await pool.query(
       `INSERT INTO quiz_stats (username, total_score, total_games_played)
        VALUES ($1, $2, 1)
@@ -71,8 +51,7 @@ export const saveGameLog = async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: {
-        gameLog: newLog,
-        userStats: stats,
+        message: 'Game log saved successfully'
       },
     });
   } catch (error) {
@@ -94,11 +73,9 @@ export const getUserGames = async (req, res, next) => {
       return res.status(200).json({ success: true, data: [] });
     }
 
-    const games = await GameLog.find({ userId }).sort({ date: -1 });
-
     res.status(200).json({
       success: true,
-      data: games,
+      data: [],
     });
   } catch (error) {
     next(error);
@@ -108,21 +85,17 @@ export const getUserGames = async (req, res, next) => {
 // Get user stats
 export const getUserStats = async (req, res, next) => {
   try {
-    let userId = null;
-    if (!userId && req.query.username) {
-      const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [req.query.username]);
-      if (userResult.rows.length > 0) {
-        userId = userResult.rows[0].id.toString();
+    const username = req.query.username;
+    let stats = { totalScore: 0, totalGamesPlayed: 0 };
+    
+    if (username) {
+      const statsResult = await pool.query('SELECT total_score, total_games_played FROM quiz_stats WHERE username = $1', [username]);
+      if (statsResult.rows.length > 0) {
+        stats = {
+          totalScore: statsResult.rows[0].total_score,
+          totalGamesPlayed: statsResult.rows[0].total_games_played
+        };
       }
-    }
-    if (!userId) {
-      return res.status(200).json({ success: true, data: { totalScore: 0, totalGamesPlayed: 0 } });
-    }
-
-    let stats = await UserStats.findOne({ userId });
-
-    if (!stats) {
-      stats = { totalScore: 0, totalGamesPlayed: 0 };
     }
 
     res.status(200).json({

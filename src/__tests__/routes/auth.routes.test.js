@@ -16,17 +16,7 @@ jest.mock('../../config/db.js', () => ({
   default: { query: jest.fn().mockResolvedValue({ rows: [] }) },
 }));
 
-// Prevent mongoose model registration from requiring a live connection
-jest.mock('../../models/game.model.js', () => ({
-  __esModule: true,
-  GameLog: jest.fn().mockImplementation(() => ({
-    save: jest.fn().mockResolvedValue({}),
-  })),
-  UserStats: {
-    findOneAndUpdate: jest.fn(),
-    findOne: jest.fn(),
-  },
-}));
+
 
 jest.mock('../../models/user.model.js', () => ({
   __esModule: true,

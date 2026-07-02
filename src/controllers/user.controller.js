@@ -2,21 +2,6 @@ import bcrypt from 'bcryptjs';
 import { findUserByIdWithPassword, updateUserPassword } from '../models/user.model.js';
 import { deleteAllUserRefreshTokens } from '../models/token.model.js';
 
-export const getProfile = async (req, res, next) => {
-  try {
-    res.status(200).json({
-      success: true,
-      data: {
-        user: {
-          id: req.user.id,
-          username: req.user.username
-        }
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const changePassword = async (req, res, next) => {
   try {

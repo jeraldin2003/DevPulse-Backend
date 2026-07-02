@@ -24,40 +24,7 @@ jest.mock('../../config/db.js', () => ({
 
 // GameLog / UserStats are constructed INSIDE the factory so babel-jest's
 // hoisting step does not raise a temporal-dead-zone error on the name.
-jest.mock('../../models/game.model.js', () => {
-  const mockSave = jest.fn().mockResolvedValue({});
 
-  const mockGameLogCtor = jest.fn().mockImplementation(() => ({
-    _id: 'gameid123',
-    userId: 'user1',
-    score: 100,
-    date: new Date().toISOString(),
-    save: mockSave,
-  }));
-
-  mockGameLogCtor.find = jest.fn().mockReturnValue({
-    sort: jest.fn().mockResolvedValue([
-      { _id: 'gameid123', userId: 'user1', score: 100, date: new Date().toISOString() },
-    ]),
-  });
-
-  return {
-    __esModule: true,
-    GameLog: mockGameLogCtor,
-    UserStats: {
-      findOneAndUpdate: jest.fn().mockResolvedValue({
-        userId: 'user1',
-        totalScore: 200,
-        totalGamesPlayed: 2,
-      }),
-      findOne: jest.fn().mockResolvedValue({
-        userId: 'user1',
-        totalScore: 200,
-        totalGamesPlayed: 2,
-      }),
-    },
-  };
-});
 
 jest.mock('../../models/user.model.js', () => ({
   __esModule: true,
@@ -103,7 +70,6 @@ jest.mock('jsonwebtoken', () => ({
 
 // ─── Import mock references ───────────────────────────────────────────────────
 
-import { GameLog, UserStats } from '../../models/game.model.js';
 import jwt from 'jsonwebtoken';
 import pool from '../../config/db.js';
 
@@ -231,14 +197,7 @@ describe('POST /api/games', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
-    expect(GameLog).toHaveBeenCalledWith(
-      expect.objectContaining({ score: 100 }),
-    );
-    expect(UserStats.findOneAndUpdate).toHaveBeenCalledWith(
-      { userId: '1' },
-      expect.objectContaining({ $inc: { totalScore: 100, totalGamesPlayed: 1 } }),
-      expect.objectContaining({ upsert: true }),
-    );
+
   });
 
   test('201 — saves game log when identity comes from body.user.username', async () => {
@@ -276,7 +235,6 @@ describe('GET /api/games', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
-    expect(GameLog.find).toHaveBeenCalledWith({ userId: '1' });
   });
 
   test('200 — fetches games when username is provided as a query param', async () => {
@@ -286,7 +244,6 @@ describe('GET /api/games', () => {
     const res = await request(app).get('/api/games?username=testuser');
 
     expect(res.status).toBe(200);
-    expect(GameLog.find).toHaveBeenCalledWith({ userId: '5' });
   });
 });
 
@@ -310,12 +267,10 @@ describe('GET /api/games/stats', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toMatchObject({ totalScore: 200, totalGamesPlayed: 2 });
-    expect(UserStats.findOne).toHaveBeenCalledWith({ userId: '1' });
   });
 
   test('200 — returns zeros when user has no stats document in Mongo', async () => {
     const headers = withValidToken({ id: 99, username: 'newplayer' });
-    UserStats.findOne.mockResolvedValueOnce(null);
 
     const res = await request(app).get('/api/games/stats').set(headers);
 
